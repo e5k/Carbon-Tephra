@@ -4,7 +4,7 @@ Created on Mon Jun 29 18:42:15 2020
 
 @author: Ben
 """
-import utm
+import UTMconv as utm
 import numpy as np
 import pandas as pd
 import random as rd
@@ -32,6 +32,36 @@ def get_index_positions(list_of_elems, element):
             break
     return index_pos_list
 
+def convert_VEI_to_latlon(VEI4, VEI5, VEI6,refVolcano,data):
+    index = get_index_positions(list(data.iloc[:,1]), refVolcano)[0]
+    utmCoords = utm.project((data.iloc[index,23],data.iloc[index,22]))
+    refZone = utmCoords[0]
+    refZoneLetter = utmCoords[1]
+    
+    VEI4_conv = VEI4.copy()
+    for i in range(len(VEI4_conv)):
+        latlon = utm.unproject(refZone, refZoneLetter, VEI4_conv[i][0], VEI4_conv[i][1])
+        VEI4_conv[i][0] = latlon[0]
+        VEI4_conv[i][1] = latlon[1]
+        
+    VEI5_conv = VEI5.copy()
+    for i in range(len(VEI5_conv)):
+        latlon = utm.unproject(refZone, refZoneLetter, VEI5_conv[i][0], VEI5_conv[i][1])
+        VEI5_conv[i][0] = latlon[0]
+        VEI5_conv[i][1] = latlon[1]
+        
+    VEI6_conv = VEI6.copy()
+    for i in range(len(VEI6_conv)):
+        latlon = utm.unproject(refZone, refZoneLetter, VEI6_conv[i][0], VEI6_conv[i][1])
+        VEI6_conv[i][0] = latlon[0]
+        VEI6_conv[i][1] = latlon[1]
+        
+    return VEI4_conv, VEI5_conv, VEI6_conv
+        
+            
+    
+    
+    
 def apply_coord_constraints(data, coordConstraints):
     if not coordConstraints[0] == None:
         data = data.loc[(data['Latitude'] < coordConstraints[0])]
@@ -41,18 +71,17 @@ def apply_coord_constraints(data, coordConstraints):
         data = data.loc[(data['Longitude'] < coordConstraints[2])]
     if not coordConstraints[3] == None:
         data = data.loc[(data['Longitude'] > coordConstraints[3])]
+        
+    data = data[(data['VEI'] > 3)]
     data = data.reset_index(drop=True)
 
     return data
 
-def get_ref_zone(data,refVolcano):
+def get_ref_coords(data,refVolcano):
     indexLoc = data[data['Volcano Name'] == refVolcano].index.tolist()[0]
-    coords = utm.from_latlon(data.iloc[indexLoc,22], data.iloc[indexLoc,23])
-    numZone = coords[2]
-    letterZone = coords[3]
-    refLon = coords[0]
-    refLat = coords[1]
-    return (numZone,letterZone, refLat, refLon)
+    refLat, refLon = (data.iloc[indexLoc,22], data.iloc[indexLoc,23])
+
+    return (refLat, refLon)
 
 
 def get_prob(data, startYear, stopYear,thresholdYear,timeStepLength, mode): #Compute the probabilities of eruption (VEI 3 & 4) for each volcano
@@ -71,7 +100,7 @@ def get_prob(data, startYear, stopYear,thresholdYear,timeStepLength, mode): #Com
     
     if not mode == "mixed":
         
-        timeStepsProbsVEI56 = (stopYear - startYear) * (12 *timeStepLength)
+        timeStepsProbsVEI56 = (stopYear - startYear) * (12 * timeStepLength)
         dataVEI5 = data.loc[(data['VEI'] == 5)]
         counterVolcanoesVEI5 = Counter(dataVEI5['Volcano Name'])
         
@@ -114,28 +143,24 @@ def get_utm_zone(lat,long):
     
     return numZone, NS
 
-def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear,refZone, mode):
+def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear, mode, timeStepLength):
     
-    stopMonth = stopYear * 12
-    startMonth = startYear * 12
+    timeSteps = int(round((stopYear - startYear) * (12 / timeStepLength)))
     eruptions = pd.DataFrame(columns=("Volcano","Year","VEI", "Lat","Lon"))    
     k=0
     
     if mode == "mixed":
         
         for j in range(len(probabilities)):
-            x = rd.choices([1,0], [probabilities[j][1],1-probabilities[j][1]], k=(stopMonth-startMonth))
+            x = rd.choices([1,0], [probabilities[j][1],1-probabilities[j][1]], k=(timeSteps))
             y = get_index_positions(x,1)
             z = [probabilities[j][3]]*len(y)
             x = [probabilities[j][0]]*len(z)
             locIndex = data.index[data['Volcano Name'] == x[0]].tolist()[0]
-    
-            coords = utm.from_latlon(data.iloc[locIndex,22],data.iloc[locIndex,23],
-                                     force_zone_number = refZone[0],force_zone_letter = refZone[1])
-            latC = coords[1]
-            lonC = coords[0]
-            if data.iloc[locIndex,22] >= 0:
-                latC = latC+10000000
+
+            latC = data.iloc[locIndex, 22]
+            lonC = data.iloc[locIndex, 23]
+
             lat = [latC]*len(z)
             lon = [lonC]*len(z)
             
@@ -146,15 +171,13 @@ def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear,refZ
         dataVEI56 = data.loc[(data['VEI'] > 4) & (data['VEI'] < 7)]
         for i in range(len(dataVEI56)):
     
-            coords = utm.from_latlon(dataVEI56.iloc[i,22],dataVEI56.iloc[i,23],
-                                     force_zone_number = refZone[0],force_zone_letter = refZone[1])
-            latC = coords[1]
-            lonC = coords[0]
-            if dataVEI56.iloc[i,22] >= 0:
-                latC = latC+10000000
+            latC = dataVEI56.iloc[i,22]
+            lonC = dataVEI56.iloc[i,23]
+
             eruptions.loc[k] = [dataVEI56.iloc[i,1], dataVEI56.iloc[i,8], 
                                 int(dataVEI56.iloc[i,5]), latC, lonC]
             k+=1
+            
         dataVEI4 = data.loc[(data['VEI'] == 4)]
         counterVolcanoes = Counter(dataVEI4['Volcano Name'])
         for i in counterVolcanoes.keys():
@@ -165,13 +188,9 @@ def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear,refZ
                     temp = dataVEI4.loc[(dataVEI4['Start Year'] < threshYear) & 
                                 (dataVEI4['Volcano Name'] == i)]
                     for l in range(len(temp)):
-    
-                        coords = utm.from_latlon(temp.iloc[l,22],temp.iloc[l,23],
-                                     force_zone_number = refZone[0],force_zone_letter = refZone[1])
-                        latC = coords[1]
-                        lonC = coords[0]
-                        if temp.iloc[l,22] >= 0:
-                            latC = latC+10000000
+                        
+                        latC = temp.iloc[l,22]
+                        lonC = temp.iloc[l,23]
                         
                         eruptions.loc[k] = [temp.iloc[l,1], temp.iloc[l,8], 
                                 int(temp.iloc[l,5]),latC,lonC]
@@ -180,18 +199,15 @@ def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear,refZ
     elif mode == "stochastic":
         
         for j in range(len(probabilities)):
-            x = rd.choices([1,0], [probabilities[j][1],1-probabilities[j][1]], k=(stopMonth-startMonth))
+            x = rd.choices([1,0], [probabilities[j][1],1-probabilities[j][1]], k=(timeSteps))
             y = get_index_positions(x,1)
             z = [probabilities[j][3]]*len(y)
             x = [probabilities[j][0]]*len(z)
             locIndex = data.index[data['Volcano Name'] == probabilities[j][0]].tolist()[0]
-    
-            coords = utm.from_latlon(data.iloc[locIndex,22],data.iloc[locIndex,23],
-                                     force_zone_number = refZone[0],force_zone_letter = refZone[1])
-            latC = coords[1]
-            lonC = coords[0]
-            if data.iloc[locIndex,22] >= 0:
-                latC = latC+10000000
+
+            latC = data.iloc[locIndex,22]
+            lonC = data.iloc[locIndex,23]
+                
             lat = [latC]*len(z)
             lon = [lonC]*len(z)
             
@@ -222,7 +238,7 @@ def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear,refZ
                 probaEruptVEI6 += probabilities[i][1]
                 listVEI6.append(probabilities[i])
 
-        x = rd.choices([1,0],[probaEruptTot, 1-probaEruptTot], k=stopMonth-startMonth)
+        x = rd.choices([1,0],[probaEruptTot, 1-probaEruptTot], k=timeSteps)
         y = get_index_positions(x,1)
         
         for i in range(len(y)):
@@ -245,12 +261,9 @@ def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear,refZ
                     
             volcano = rd.choices(vol, weights=prob)
             locIndex = data.index[data['Volcano Name'] == volcano[0]].tolist()[0]
-            coords = utm.from_latlon(data.iloc[locIndex,22],data.iloc[locIndex,23],
-                                     force_zone_number = refZone[0],force_zone_letter = refZone[1])
-            latC = coords[1]
-            lonC = coords[0]
-            if data.iloc[locIndex,22] >= 0:
-                latC = latC+10000000
+
+            latC = data.iloc[locIndex,22]
+            lonC = data.iloc[locIndex,23]
             
             eruptions.loc[k] = [volcano[0], math.floor(y[i]/12)+startYear,VEI[0], latC, lonC]
             k+=1
@@ -258,32 +271,32 @@ def get_stoch_eruptions(data, probabilities, startYear, stopYear,threshYear,refZ
     eruptions = eruptions.sort_values(by=['Year'], ascending=False)
     return(eruptions)
 
-def create_vei_files(inputFileFolder, refVolcano, eruptions, refVEI, refZone):
-    refLat = refZone[2]
-    refLon = refZone[3]
+def create_vei_files(inputFileFolder, refVolcano, data, refVEI, refCoords):
+    refLat = refCoords[0]
+    refLon = refCoords[1]
     
     savePath = inputFileFolder + "VEIs"
-    for i in range(len(eruptions)):
+    for i in range(len(data)):
         
         if not path.exists(savePath):
             mkdir(savePath)
-        if not path.exists(savePath / Path(eruptions.iloc[i,0] + "VEI" + str(eruptions.iloc[i,2]) + ".csv")):
-            latDecal = eruptions.iloc[i,3] - refLat
-            lonDecal = eruptions.iloc[i,4] - refLon
-            if(eruptions.iloc[i,2]) == 4:
+        if not path.exists(savePath / Path(str(data.loc[i,'Volcano Name']) + "VEI" + str(int(data.loc[i,'VEI'])) + ".csv")):
+            latDecal = data.loc[i,'Latitude'] - refLat
+            lonDecal = data.loc[i,'Longitude'] - refLon
+            if(data.loc[i,'VEI']) == 4:
                 matCopy = refVEI[0].copy()
-            elif(eruptions.iloc[i,2]) == 5:
+            elif(data.loc[i,'VEI']) == 5:
                 matCopy = refVEI[1].copy()
-            elif(eruptions.iloc[i,2]) == 6:
+            elif(data.loc[i,'VEI']) == 6:
                 matCopy = refVEI[2].copy()
             
             matCopy[:,1] += latDecal
             matCopy[:,0] += lonDecal
             
-            np.savetxt((savePath / Path(eruptions.iloc[i,0] + "VEI" + str(eruptions.iloc[i,2]) + ".csv")),
-                        matCopy, delimiter=",")
+            np.savetxt((savePath / Path(data.iloc[i,1] + "VEI" + str(int(data.iloc[i,5])) + ".csv")), 
+                       matCopy, delimiter=",")
     fileList = []
-    uniqueID = (eruptions["Volcano"] + "." + eruptions["VEI"].astype(str)).unique()
+    uniqueID = (data["Volcano Name"] + "." + data["VEI"].astype(str)).unique()
     for i in range(len(uniqueID)):
         temp = uniqueID[i].split(".")
         fileList.append(temp[0] + "VEI" + temp[1] + ".csv")
@@ -323,13 +336,18 @@ def create_grid(inputFileFolder, fileList, cellSize, outputFolder, probThreshold
             elif maxLon < max(temp.iloc[:,0]):
                 maxLon = max(temp.iloc[:,0])
                 
-        mapMatrix = np.empty((math.ceil(maxLat/cellSize) - math.floor(minLat/cellSize),
-                                  math.ceil(maxLon/cellSize) - math.floor(minLon/cellSize)), dtype=object)
+        maxLon = cellSize*(round(maxLon/cellSize))
+        minLon = cellSize*(round(minLon/cellSize))
+        maxLat = cellSize*(round(maxLat/cellSize))
+        minLat = cellSize*(round(minLat/cellSize))
+        
+        mapMatrix = np.empty((int((maxLat - minLat)/cellSize),
+                                  int((maxLon - minLon)/cellSize)), dtype=object)
         for i in range(mapMatrix.shape[0]):
             for j in range(mapMatrix.shape[1]):
                 mapMatrix[i,j] = []
-                mapMatrix[i,j].append((math.ceil(minLat/cellSize)*cellSize)+(i*cellSize))
-                mapMatrix[i,j].append((math.ceil(minLon/cellSize)*cellSize)+(j*cellSize))
+                mapMatrix[i,j].append(minLat+(i*cellSize))
+                mapMatrix[i,j].append(minLon+(j*cellSize))
         np.save(outputFolder + "grid", mapMatrix)
         coords = [minLat,minLon]
         np.save(outputFolder + "coords", coords)
@@ -340,7 +358,7 @@ def create_grid(inputFileFolder, fileList, cellSize, outputFolder, probThreshold
         minLat = coords[0]
         minLon = coords[1]
     
-    return mapMatrix, math.ceil(minLat/cellSize)*cellSize, math.ceil(minLon/cellSize)*cellSize
+    return mapMatrix, minLat, minLon
 
 def add_eruptions_to_grid(inputFileFolder,fileList, eruptions, grid, probThreshold, minLat, minLon, cellSize):
     veis = dict()
@@ -354,7 +372,8 @@ def add_eruptions_to_grid(inputFileFolder,fileList, eruptions, grid, probThresho
         valuesThresh = values[(values.iloc[:,2] >= probThreshold)]
         
         for j in range(len(valuesThresh)):
-            grid[(math.floor((valuesThresh.iloc[j,1]-minLat)/cellSize)),math.floor((valuesThresh.iloc[j,0]-minLon)/cellSize)].append(eruptions.iloc[i,1])
+            grid[int(((cellSize*round(valuesThresh.iloc[j,1]/cellSize)) - minLat)/cellSize),
+                 int(((cellSize*round(valuesThresh.iloc[j,0]/cellSize)) - minLon)/cellSize)].append(eruptions.iloc[i,1])
         
 
 def carbonAccumulation(x):
@@ -399,3 +418,5 @@ def save_results(outputFolder, carbonGrid, logC, eruptions):
     
     return count
         
+
+
