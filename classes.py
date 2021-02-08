@@ -6,8 +6,8 @@ Created on Tue Feb  2 14:40:23 2021
 """
 
 class ZONE:
-    def __init__(self, new, num, let, orientation=None):
-        if new:
+    def __init__(self, extended, num, let, orientation=None):
+        if extended:
             if orientation == "N":
                 self.num = num
                 self.let = chr(ord(let) + 1)
@@ -32,4 +32,11 @@ class ZONE:
             self.let = let
             self.name = chr(self.num) + self.let
             
+        self.years = []
+        self.VEIs = []
+        self.carbon = 0
+        self.surface = 0
         
+        
+class VOLCANO:
+    def __init__(self, name, lat, lon)
