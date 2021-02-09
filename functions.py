@@ -13,6 +13,7 @@ import math
 from os import path, mkdir,listdir
 from pathlib import Path
 from scipy.integrate import quad
+from classes import *
 
 
 def get_index_positions(list_of_elems, element):

@@ -47,5 +47,5 @@ class VOLCANO:
         self.zone_let = coords[3]
         self.easting = coords[0]
         self.northing = coords[1]
-        proba = {}
+        self.proba = {}
         
