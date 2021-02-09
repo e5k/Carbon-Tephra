@@ -4,6 +4,8 @@ Created on Tue Feb  2 14:40:23 2021
 
 @author: Ben
 """
+import utm
+
 
 class ZONE:
     def __init__(self, extended, num, let, orientation=None):
@@ -39,4 +41,11 @@ class ZONE:
         
         
 class VOLCANO:
-    def __init__(self, name, lat, lon)
+    def __init__(self, name, lat, lon):
+        coords = utm.from_latlon(lat,lon)
+        self.zone_num = coords[2]
+        self.zone_let = coords[3]
+        self.easting = coords[0]
+        self.northing = coords[1]
+        proba = {}
+        

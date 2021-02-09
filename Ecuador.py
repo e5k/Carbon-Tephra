@@ -20,9 +20,9 @@ Declare variables
 """
 
 timeStepLength = 1            #Time step for the simulation in months
-inputFileFolder = "c:/users/ben/OneDrive - UCL/GVP/"
+inputFileFolder = "/home/ben/OneDrive/GVP/"
 inputFile = "GVP_Eruption_Results.xls.xlsx"          #File containing infos for the eruptions, from GVP website
-outputFolder = "G:/Results GVP/Sensi proba/Mixed/"
+outputFolder = "/media/ben/T7/Results GVP/Sensi proba/Mixed/"
 VEI4MAT = "atacazo_vei4.mat"
 refVolcano = 'Atacazo'
 carbonReduction = 0.5   #Proportion of carbon loss in buried soils
@@ -119,7 +119,7 @@ for j in (0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9):
 mode = "sequential"
 for j in (0.8,0.1):
     probThreshold = j
-    outputFolder = "G:/Results GVP/Sensi proba/"+ str(mode) +"/" + str(j) + "/"
+    outputFolder = "/media/ben/T7/Results GVP/Sensi proba/"+ str(mode) +"/" + str(j) + "/"
     
     
     if not path.exists(outputFolder):
